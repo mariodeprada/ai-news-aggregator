@@ -58,6 +58,32 @@ export class SupabaseNewsArticleRepository implements NewsArticleRepositoryPort 
     return this.mapToDomain(data);
   }
 
+  async findByUrls(urls: string[]): Promise<Set<string>> {
+    if (urls.length === 0) {
+      return new Set<string>();
+    }
+
+    this.logger.debug(`Checking ${urls.length} URLs for duplicates`);
+    
+    const client = this.supabaseClient.getClient();
+    const table = this.supabaseClient.getNewsArticlesTable();
+
+    const { data, error } = await client
+      .from(table)
+      .select('article_url')
+      .in('article_url', urls);
+
+    if (error) {
+      this.logger.error(`Failed to check duplicate URLs: ${error.message}`);
+      throw error;
+    }
+
+    const existingUrls = new Set<string>(data?.map(record => record.article_url) || []);
+    this.logger.debug(`Found ${existingUrls.size} existing URLs`);
+    
+    return existingUrls;
+  }
+
   async save(article: NewsArticle): Promise<NewsArticle> {
     this.logger.debug(`Saving article: ${article.id} - "${article.title.substring(0, 50)}..."`);
     

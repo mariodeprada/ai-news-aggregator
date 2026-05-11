@@ -18,6 +18,16 @@ export class InMemoryNewsArticleRepository implements NewsArticleRepositoryPort 
     return null;
   }
 
+  async findByUrls(urls: string[]): Promise<Set<string>> {
+    const existingUrls = new Set<string>();
+    for (const article of this.articles.values()) {
+      if (urls.includes(article.articleUrl)) {
+        existingUrls.add(article.articleUrl);
+      }
+    }
+    return existingUrls;
+  }
+
   async save(article: NewsArticle): Promise<NewsArticle> {
     this.articles.set(article.id, article);
     this.urlIndex.set(article.articleUrl, article.id);

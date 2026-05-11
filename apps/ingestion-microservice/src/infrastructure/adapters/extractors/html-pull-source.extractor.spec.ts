@@ -68,32 +68,141 @@ describe('HtmlPullSourceExtractor', () => {
     );
   });
 
-  it('should log warning about HTML extraction not being implemented', async () => {
-    const warnSpy = jest.spyOn(extractor['logger'], 'warn');
-    
+  it('should extract articles from HTML using class identifiers', async () => {
+    const html = `
+      <html>
+        <body>
+          <article>
+            <h2 class="article-title"><a href="https://example.com/article-1">Article 1</a></h2>
+            <p class="article-content">Content of article 1</p>
+            <img class="article-image" src="https://example.com/image1.jpg" />
+            <span class="article-author">Author 1</span>
+            <time class="article-date">2024-01-02T10:00:00Z</time>
+          </article>
+          <article>
+            <h2 class="article-title"><a href="https://example.com/article-2">Article 2</a></h2>
+            <p class="article-content">Content of article 2</p>
+            <img class="article-image" src="https://example.com/image2.jpg" />
+            <span class="article-author">Author 2</span>
+            <time class="article-date">2024-01-02T12:00:00Z</time>
+          </article>
+        </body>
+      </html>
+    `;
+
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      text: async () => '<html></html>',
-    } as Response);
-
-    await extractor.extract(mockSource, undefined);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      'HTML extraction not yet implemented - requires DOM parser'
-    );
-    
-    warnSpy.mockRestore();
-  });
-
-  it('should return empty array when HTML extraction is not implemented', async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () => '<html><body>Content</body></html>',
+      text: async () => html,
     } as Response);
 
     const articles = await extractor.extract(mockSource, undefined);
 
-    expect(articles).toHaveLength(0);
+    expect(articles).toHaveLength(2);
+    expect(articles[0]).toMatchObject({
+      title: 'Article 1',
+      articleUrl: 'https://example.com/article-1',
+      content: 'Content of article 1',
+      mainImageUrl: 'https://example.com/image1.jpg',
+      originalAuthor: 'Author 1',
+    });
+    expect(articles[1]).toMatchObject({
+      title: 'Article 2',
+      articleUrl: 'https://example.com/article-2',
+    });
+  });
+
+  it('should filter articles by lastPolledAt', async () => {
+    const html = `
+      <html>
+        <body>
+          <article>
+            <h2 class="article-title"><a href="https://example.com/old">Old Article</a></h2>
+            <time class="article-date">2024-01-01T00:00:00Z</time>
+          </article>
+          <article>
+            <h2 class="article-title"><a href="https://example.com/new">New Article</a></h2>
+            <time class="article-date">2024-01-02T00:00:00Z</time>
+          </article>
+        </body>
+      </html>
+    `;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => html,
+    } as Response);
+
+    const lastPolledAt = new Date('2024-01-01T12:00:00Z');
+    const articles = await extractor.extract(mockSource, lastPolledAt);
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0].title).toBe('New Article');
+  });
+
+  it('should use fallback values when selectors do not match', async () => {
+    const html = `
+      <html>
+        <body>
+          <h2 class="article-title"><a href="https://example.com/article">Article Without Meta</a></h2>
+        </body>
+      </html>
+    `;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => html,
+    } as Response);
+
+    const articles = await extractor.extract(mockSource, undefined);
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0].title).toBe('Article Without Meta');
+    expect(articles[0].content).toBe('');
+    expect(articles[0].mainImageUrl).toBe('');
+    expect(articles[0].originalAuthor).toBe('Unknown');
+    expect(articles[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it('should skip articles without title', async () => {
+    const html = `
+      <html>
+        <body>
+          <h2 class="article-title"></h2>
+          <h2 class="article-title"><a href="https://example.com/valid">Valid Article</a></h2>
+        </body>
+      </html>
+    `;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => html,
+    } as Response);
+
+    const articles = await extractor.extract(mockSource, undefined);
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0].title).toBe('Valid Article');
+  });
+
+  it('should skip articles without URL', async () => {
+    const html = `
+      <html>
+        <body>
+          <h2 class="article-title">No Link Article</h2>
+          <h2 class="article-title"><a href="https://example.com/valid">Valid Article</a></h2>
+        </body>
+      </html>
+    `;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => html,
+    } as Response);
+
+    const articles = await extractor.extract(mockSource, undefined);
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0].title).toBe('Valid Article');
   });
 
   it('should pass lastPolledAt to parseHtml method', async () => {

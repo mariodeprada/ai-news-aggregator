@@ -33,13 +33,22 @@ export class ProcessScheduledPullUseCase {
         const extractedArticles = await this.extractor.extract(source, source.lastPolledAt ?? undefined);
         this.logger.debug(`Extracted ${extractedArticles.length} articles from ${source.id}`);
 
+        if (extractedArticles.length === 0) {
+          this.logger.debug(`No articles to process for source ${source.id}`);
+          await this.pullSourceRepository.updateLastPolledAt(source.id, now);
+          success.push(source.id);
+          continue;
+        }
+
+        const articleUrls = extractedArticles.map(article => article.articleUrl);
+        const existingUrls = await this.newsArticleRepository.findByUrls(articleUrls);
+        this.logger.debug(`Found ${existingUrls.size} existing articles out of ${articleUrls.length}`);
+
         let newArticlesCount = 0;
         let duplicateCount = 0;
 
         for (const articleData of extractedArticles) {
-          const existing = await this.newsArticleRepository.findByUrl(articleData.articleUrl);
-          
-          if (existing) {
+          if (existingUrls.has(articleData.articleUrl)) {
             this.logger.debug(`Article already exists: ${articleData.articleUrl}`);
             duplicateCount++;
             continue;

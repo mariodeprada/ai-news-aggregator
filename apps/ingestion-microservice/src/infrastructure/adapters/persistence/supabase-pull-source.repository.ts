@@ -7,7 +7,13 @@ interface PullSourceDbRecord {
   id: string;
   type: 'rss' | 'html';
   source_url: string;
-  class_identifiers: Record<string, string> | null;
+  class_identifiers: {
+    title: string;
+    content: string;
+    mainImageUrl: string;
+    originalAuthor: string;
+    createdAt: string;
+  } | null;
   last_polled_at: string | null;
   is_active: boolean;
   created_at: string;
@@ -88,12 +94,17 @@ export class SupabasePullSourceRepository implements PullSourceRepositoryPort {
         record.source_url,
       );
     } else {
+      if (!record.class_identifiers) {
+        this.logger.warn(`HTML source ${record.id} has null class_identifiers - skipping`);
+        return null as any;
+      }
+
       return new HtmlPullSource(
         record.id,
         lastPolledAt,
         record.is_active,
         record.source_url,
-        record.class_identifiers as any,
+        record.class_identifiers,
       );
     }
   }
