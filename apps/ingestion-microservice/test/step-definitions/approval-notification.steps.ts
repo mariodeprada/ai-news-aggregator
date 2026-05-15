@@ -1,10 +1,9 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import { CustomWorld } from '../support/custom-world';
 import { ArticleStatus, NewsArticle } from '@ai-news-aggregator/news-article';
-import { ArticleNotificationData } from '../../src/core/domain/ports/telegram-notification.port';
 
 Given(
-  'the notification system is configured with a valid Telegram bot token and administrators @usernames',
+  'the notification system is configured with a valid recipient email address',
   async function (this: CustomWorld) {
     // Configuration is handled by the in-memory repository for testing
   },
@@ -78,7 +77,7 @@ When(
     try {
       await this.sendNotificationUseCase.execute();
 
-      const lastNotification = this.telegramNotification.getLastNotification();
+      const lastNotification = this.notification.getLastNotification();
       if (lastNotification !== null && lastNotification.length > 0) {
         this.notificationSent = true;
         this.lastNotificationArticles = lastNotification;
@@ -139,7 +138,7 @@ Then(
       throw new Error('Expected no notification to be sent but one was sent');
     }
 
-    const lastNotification = this.telegramNotification.getLastNotification();
+    const lastNotification = this.notification.getLastNotification();
     if (lastNotification !== null && lastNotification.length > 0) {
       throw new Error('Expected no notification articles but got some');
     }

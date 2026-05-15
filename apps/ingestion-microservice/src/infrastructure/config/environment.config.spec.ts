@@ -20,10 +20,16 @@ describe('environment config validation', () => {
       supabaseServiceRoleKey: '',
       supabaseNewsArticlesTable: 'news_articles',
       supabasePullSourcesTable: 'pull_sources',
-      telegramBotToken: '',
-      telegramAdminChatId: '',
-      telegramAdminUserIds: [],
-      telegramPollingEnabled: true,
+      notificationEmailTo: '',
+      notificationEmailFrom: '',
+      notificationReviewBaseUrl: '',
+      notificationJwtSecret: '',
+      notificationJwtTtlSeconds: 86400,
+      smtpHost: '',
+      smtpPort: 587,
+      smtpUser: '',
+      smtpPass: '',
+      smtpSecure: false,
       pullSourcesPollIntervalMs: 300000,
       pullSourcesSchedulerEnabled: true,
       approvalNotificationSchedulerEnabled: true,
@@ -33,8 +39,9 @@ describe('environment config validation', () => {
   it('should coerce numeric and boolean environment values', () => {
     process.env = {
       PORT: '3100',
-      TELEGRAM_ADMIN_USER_IDS: '123, 987',
-      TELEGRAM_POLLING_ENABLED: 'false',
+      NOTIFICATION_JWT_TTL_SECONDS: '7200',
+      SMTP_PORT: '2525',
+      SMTP_SECURE: 'true',
       PULL_SOURCES_POLL_INTERVAL_MS: '2000',
       PULL_SOURCES_SCHEDULER_ENABLED: '0',
       APPROVAL_NOTIFICATION_SCHEDULER_ENABLED: 'yes',
@@ -43,8 +50,9 @@ describe('environment config validation', () => {
     const config = getEnvironmentConfig();
 
     expect(config.port).toBe(3100);
-    expect(config.telegramAdminUserIds).toEqual(['123', '987']);
-    expect(config.telegramPollingEnabled).toBe(false);
+    expect(config.notificationJwtTtlSeconds).toBe(7200);
+    expect(config.smtpPort).toBe(2525);
+    expect(config.smtpSecure).toBe(true);
     expect(config.pullSourcesPollIntervalMs).toBe(2000);
     expect(config.pullSourcesSchedulerEnabled).toBe(false);
     expect(config.approvalNotificationSchedulerEnabled).toBe(true);
@@ -54,7 +62,6 @@ describe('environment config validation', () => {
     process.env = {
       PORT: 'not-a-port',
       SUPABASE_URL: 'not-a-url',
-      TELEGRAM_ADMIN_USER_IDS: '123,not-a-number',
     };
 
     expect(() => getEnvironmentConfig()).toThrow(

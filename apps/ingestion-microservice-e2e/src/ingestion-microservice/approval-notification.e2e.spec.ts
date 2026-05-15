@@ -46,8 +46,7 @@ describe('Approval Notification E2E', () => {
 
       await context.sendBatchNotification.execute();
 
-      const lastNotification =
-        context.telegramNotification.getLastNotification();
+      const lastNotification = context.notification.getLastNotification();
       expect(lastNotification).not.toBeNull();
       expect(lastNotification?.length).toBe(3);
 
@@ -78,8 +77,7 @@ describe('Approval Notification E2E', () => {
 
       await context.sendBatchNotification.execute();
 
-      const lastNotification =
-        context.telegramNotification.getLastNotification();
+      const lastNotification = context.notification.getLastNotification();
       expect(lastNotification).toBeNull();
     });
   });
@@ -118,8 +116,7 @@ describe('Approval Notification E2E', () => {
 
       await context.sendBatchNotification.execute();
 
-      const lastNotification =
-        context.telegramNotification.getLastNotification();
+      const lastNotification = context.notification.getLastNotification();
       expect(lastNotification).toBeNull();
     });
   });

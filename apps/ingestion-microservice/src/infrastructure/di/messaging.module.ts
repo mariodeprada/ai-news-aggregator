@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
-import { TelegramNotificationAdapter } from '../adapters/messaging/telegram-notification.adapter';
-import { TelegramNotificationPort } from '../../core/domain/ports/telegram-notification.port';
+import { NotificationPort } from '../../core/domain/ports/notification.port';
+import { EmailClientProvider } from '../adapters/messaging/email-client.provider';
+import { EmailNotificationAdapter } from '../adapters/messaging/email-notification.adapter';
+import { ReviewTokenService } from '../adapters/messaging/review-token.service';
 
 @Module({
   providers: [
+    EmailClientProvider,
+    ReviewTokenService,
     {
-      provide: TelegramNotificationPort,
-      useClass: TelegramNotificationAdapter,
+      provide: NotificationPort,
+      useClass: EmailNotificationAdapter,
     },
   ],
-  exports: [TelegramNotificationPort],
+  exports: [NotificationPort, ReviewTokenService],
 })
 export class MessagingModule {}
