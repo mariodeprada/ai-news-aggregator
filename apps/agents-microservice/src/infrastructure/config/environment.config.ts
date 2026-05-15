@@ -2,14 +2,25 @@ import Joi from 'joi';
 
 export interface AgentsEnvironmentConfig {
   port: number;
+  articleSummarizationSchedulerEnabled: boolean;
 }
 
 interface ValidatedEnvironment {
   PORT: number;
+  ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: boolean;
 }
+
+const booleanSchema = Joi.boolean()
+  .truthy('true')
+  .truthy('1')
+  .truthy('yes')
+  .falsy('false')
+  .falsy('0')
+  .falsy('no');
 
 const environmentSchema = Joi.object<ValidatedEnvironment>({
   PORT: Joi.number().integer().min(1).max(65535).default(3001),
+  ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: booleanSchema.default(true),
 }).unknown(true);
 
 export function getEnvironmentConfig(): AgentsEnvironmentConfig {
@@ -27,5 +38,7 @@ export function getEnvironmentConfig(): AgentsEnvironmentConfig {
 
   return {
     port: env.PORT,
+    articleSummarizationSchedulerEnabled:
+      env.ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED,
   };
 }

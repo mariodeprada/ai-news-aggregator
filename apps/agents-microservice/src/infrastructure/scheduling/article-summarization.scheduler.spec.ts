@@ -15,6 +15,10 @@ describe('ArticleSummarizationScheduler', () => {
   });
 
   it('should run scheduled summarization when enabled', async () => {
+    process.env = {
+      ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: 'true',
+    };
+
     const processScheduledSummarization = {
       execute: jest.fn().mockResolvedValue({ processed: 2 }),
     } as unknown as ProcessScheduledSummarizationUseCase;
@@ -28,7 +32,29 @@ describe('ArticleSummarizationScheduler', () => {
     expect(processScheduledSummarization.execute).toHaveBeenCalledTimes(1);
   });
 
+  it('should skip scheduled summarization when disabled', async () => {
+    process.env = {
+      ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: 'false',
+    };
+
+    const processScheduledSummarization = {
+      execute: jest.fn(),
+    } as unknown as ProcessScheduledSummarizationUseCase;
+
+    const scheduler = new ArticleSummarizationScheduler(
+      processScheduledSummarization,
+    );
+
+    await scheduler.handleSummarization();
+
+    expect(processScheduledSummarization.execute).not.toHaveBeenCalled();
+  });
+
   it('should log errors thrown by the summarization process', async () => {
+    process.env = {
+      ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: 'true',
+    };
+
     const processScheduledSummarization = {
       execute: jest.fn().mockRejectedValue(new Error('boom')),
     } as unknown as ProcessScheduledSummarizationUseCase;
@@ -50,6 +76,10 @@ describe('ArticleSummarizationScheduler', () => {
   });
 
   it('should skip execution when a previous cycle is still running', async () => {
+    process.env = {
+      ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: 'true',
+    };
+
     let releaseExecution: (() => void) | undefined;
 
     const processScheduledSummarization = {

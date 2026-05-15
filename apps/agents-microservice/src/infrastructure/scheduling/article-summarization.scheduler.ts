@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ProcessScheduledSummarizationUseCase } from '../../core/application/use-cases/process-scheduled-summarization.use-case';
+import { getSchedulingConfig } from '../config/scheduling.config';
 
 @Injectable()
 export class ArticleSummarizationScheduler {
   private readonly logger = new Logger(ArticleSummarizationScheduler.name);
+  private readonly config = getSchedulingConfig();
   private isRunning = false;
 
   constructor(
@@ -13,6 +15,11 @@ export class ArticleSummarizationScheduler {
 
   @Cron(CronExpression.EVERY_5_SECONDS)
   async handleSummarization(): Promise<void> {
+    if (!this.config.articleSummarizationSchedulerEnabled) {
+      this.logger.debug('Article summarization scheduler disabled by configuration');
+      return;
+    }
+
     if (this.isRunning) {
       this.logger.debug(
         'Summarization scheduler already in progress - skipping',

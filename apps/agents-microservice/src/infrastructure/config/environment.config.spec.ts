@@ -16,17 +16,20 @@ describe('agents environment config validation', () => {
 
     expect(config).toEqual({
       port: 3001,
+      articleSummarizationSchedulerEnabled: true,
     });
   });
 
-  it('should coerce numeric environment values', () => {
+  it('should coerce numeric and boolean environment values', () => {
     process.env = {
       PORT: '3200',
+      ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED: 'false',
     };
 
     const config = getEnvironmentConfig();
 
     expect(config.port).toBe(3200);
+    expect(config.articleSummarizationSchedulerEnabled).toBe(false);
   });
 
   it('should reject invalid environment values', () => {
