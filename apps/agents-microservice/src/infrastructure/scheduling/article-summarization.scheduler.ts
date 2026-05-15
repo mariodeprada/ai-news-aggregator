@@ -13,7 +13,7 @@ export class ArticleSummarizationScheduler {
     private readonly processScheduledSummarization: ProcessScheduledSummarizationUseCase,
   ) {}
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleSummarization(): Promise<void> {
     if (!this.config.articleSummarizationSchedulerEnabled) {
       this.logger.debug('Article summarization scheduler disabled by configuration');
