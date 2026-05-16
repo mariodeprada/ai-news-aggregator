@@ -45,3 +45,6 @@ Thumbs.db
 
 # environment variables
 .env
+
+# local SQL seeds
+sql/local/
