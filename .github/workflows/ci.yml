@@ -40,8 +40,14 @@ jobs:
       - name: Unit tests
         run: npx nx run-many -t test --all
 
-      - name: Ingestion Cucumber tests
+      - name: Ingestion integration tests
         run: npx nx run ingestion-microservice:test:e2e
+
+      - name: Agents integration tests
+        run: npx nx run agents-microservice:test:e2e
+
+      - name: Publishing integration tests
+        run: npx nx run publishing-microservice:test:e2e
 
       - name: Build
         run: npx nx run-many -t build --all

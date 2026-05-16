@@ -11,10 +11,7 @@
         "jestConfig": "apps/publishing-microservice-e2e/jest.config.cts",
         "passWithNoTests": true
       },
-      "dependsOn": [
-        "publishing-microservice:build",
-        "publishing-microservice:serve"
-      ]
+      "dependsOn": ["publishing-microservice:build"]
     }
   }
 }

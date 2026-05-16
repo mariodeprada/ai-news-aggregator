@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS news_articles (
   author TEXT NOT NULL,
   main_image_url TEXT,
   pull_source_id TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('CANDIDATE', 'APPROVED', 'REJECTED')),
+  status TEXT NOT NULL CHECK (status IN ('CANDIDATE', 'APPROVED', 'REJECTED', 'PUBLISHED')),
   notified BOOLEAN NOT NULL DEFAULT FALSE,
   generated_summary TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
