@@ -1,10 +1,10 @@
 Feature: Periodic News Approval Notification
   As a content aggregation platform
   I want to periodically pull pending news articles to notify the administrators
-  So that they can review and approve news in batches via Telegram
+  So that they can review and approve news in batches via email
 
   Background:
-    Given the notification system is configured with a valid Telegram bot token and administrators @usernames
+    Given the notification system is configured with a valid recipient email address
     And the system is scheduled to run the notification process every hour
     And there are articles in the repository with different statuses
 

@@ -1,9 +1,14 @@
-import { TelegramNotificationPort, ArticleNotificationData } from '../../ports/telegram-notification.port';
+import {
+  ArticleNotificationData,
+  NotificationPort,
+} from '../../ports/notification.port';
 
-export class InMemoryTelegramNotificationRepository implements TelegramNotificationPort {
+export class InMemoryNotificationRepository implements NotificationPort {
   private sentNotifications: ArticleNotificationData[][] = [];
 
-  async sendBatchNotification(articles: ArticleNotificationData[]): Promise<void> {
+  async sendBatchNotification(
+    articles: ArticleNotificationData[],
+  ): Promise<void> {
     this.sentNotifications.push(articles);
   }
 

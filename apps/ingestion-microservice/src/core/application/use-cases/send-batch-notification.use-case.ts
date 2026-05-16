@@ -1,9 +1,8 @@
-import { Logger } from '@nestjs/common';
-import { Injectable } from '@nestjs/common';
 import { NewsArticleRepositoryPort } from '@ai-news-aggregator/news-article';
-import { GetArticlesToNotifyUseCase } from './get-articles-to-notify.use-case';
-import { TelegramNotificationPort } from '../../domain/ports/telegram-notification.port';
+import { Injectable, Logger } from '@nestjs/common';
 import { SendNotificationError } from '../../domain/errors/send-notification.error';
+import { NotificationPort } from '../../domain/ports/notification.port';
+import { GetArticlesToNotifyUseCase } from './get-articles-to-notify.use-case';
 
 @Injectable()
 export class SendBatchNotificationUseCase {
@@ -12,7 +11,7 @@ export class SendBatchNotificationUseCase {
   constructor(
     private readonly getArticlesToNotify: GetArticlesToNotifyUseCase,
     private readonly articleRepository: NewsArticleRepositoryPort,
-    private readonly telegramNotification: TelegramNotificationPort
+    private readonly notification: NotificationPort,
   ) {}
 
   async execute(): Promise<void> {
@@ -25,23 +24,27 @@ export class SendBatchNotificationUseCase {
       return;
     }
 
-    const notificationData = articlesToNotify.map(article => ({
+    const notificationData = articlesToNotify.map((article) => ({
       articleId: article.id,
       title: article.title,
       articleUrl: article.articleUrl,
       mainImageUrl: article.mainImageUrl,
-      originalAuthor: article.author
+      originalAuthor: article.author,
     }));
 
-    this.logger.debug(`Sending batch notification with ${notificationData.length} articles...`);
+    this.logger.debug(
+      `Sending batch notification with ${notificationData.length} articles...`,
+    );
     try {
-      await this.telegramNotification.sendBatchNotification(notificationData);
+      await this.notification.sendBatchNotification(notificationData);
       this.logger.log('Batch notification sent successfully');
     } catch (error) {
       const errorObj = error as Error;
       this.logger.error(`Failed to send notification: ${errorObj.message}`);
       this.logger.debug(`Stack trace: ${errorObj.stack}`);
-      throw new SendNotificationError(`Failed to send notification: ${errorObj.message}`);
+      throw new SendNotificationError(
+        `Failed to send notification: ${errorObj.message}`,
+      );
     }
 
     this.logger.debug('Updating article notification status...');
@@ -51,6 +54,8 @@ export class SendBatchNotificationUseCase {
       this.logger.debug(`Article ${article.id} marked as notified`);
     }
 
-    this.logger.log(`SendBatchNotification completed: ${articlesToNotify.length} articles notified`);
+    this.logger.log(
+      `SendBatchNotification completed: ${articlesToNotify.length} articles notified`,
+    );
   }
 }

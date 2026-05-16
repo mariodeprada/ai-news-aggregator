@@ -6,10 +6,16 @@ export interface IngestionEnvironmentConfig {
   supabaseServiceRoleKey: string;
   supabaseNewsArticlesTable: string;
   supabasePullSourcesTable: string;
-  telegramBotToken: string;
-  telegramAdminChatId: string;
-  telegramAdminUserIds: string[];
-  telegramPollingEnabled: boolean;
+  notificationEmailTo: string;
+  notificationEmailFrom: string;
+  notificationReviewBaseUrl: string;
+  notificationJwtSecret: string;
+  notificationJwtTtlSeconds: number;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+  smtpSecure: boolean;
   pullSourcesPollIntervalMs: number;
   pullSourcesSchedulerEnabled: boolean;
   approvalNotificationSchedulerEnabled: boolean;
@@ -21,10 +27,16 @@ interface ValidatedEnvironment {
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_NEWS_ARTICLES_TABLE: string;
   SUPABASE_PULL_SOURCES_TABLE: string;
-  TELEGRAM_BOT_TOKEN: string;
-  TELEGRAM_ADMIN_CHAT_ID: string;
-  TELEGRAM_ADMIN_USER_IDS: string;
-  TELEGRAM_POLLING_ENABLED: boolean;
+  NOTIFICATION_EMAIL_TO: string;
+  NOTIFICATION_EMAIL_FROM: string;
+  NOTIFICATION_REVIEW_BASE_URL: string;
+  NOTIFICATION_JWT_SECRET: string;
+  NOTIFICATION_JWT_TTL_SECONDS: number;
+  SMTP_HOST: string;
+  SMTP_PORT: number;
+  SMTP_USER: string;
+  SMTP_PASS: string;
+  SMTP_SECURE: boolean;
   PULL_SOURCES_POLL_INTERVAL_MS: number;
   PULL_SOURCES_SCHEDULER_ENABLED: boolean;
   APPROVAL_NOTIFICATION_SCHEDULER_ENABLED: boolean;
@@ -48,13 +60,16 @@ const environmentSchema = Joi.object<ValidatedEnvironment>({
   SUPABASE_PULL_SOURCES_TABLE: Joi.string()
     .pattern(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
     .default('pull_sources'),
-  TELEGRAM_BOT_TOKEN: Joi.string().allow('').default(''),
-  TELEGRAM_ADMIN_CHAT_ID: Joi.string().allow('').default(''),
-  TELEGRAM_ADMIN_USER_IDS: Joi.string()
-    .pattern(/^\s*$|^\d+(?:\s*,\s*\d+)*$/)
-    .allow('')
-    .default(''),
-  TELEGRAM_POLLING_ENABLED: booleanSchema.default(true),
+  NOTIFICATION_EMAIL_TO: Joi.string().email({ tlds: false }).allow('').default(''),
+  NOTIFICATION_EMAIL_FROM: Joi.string().email({ tlds: false }).allow('').default(''),
+  NOTIFICATION_REVIEW_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow('').default(''),
+  NOTIFICATION_JWT_SECRET: Joi.string().allow('').default(''),
+  NOTIFICATION_JWT_TTL_SECONDS: Joi.number().integer().min(60).default(86400),
+  SMTP_HOST: Joi.string().allow('').default(''),
+  SMTP_PORT: Joi.number().integer().min(1).max(65535).default(587),
+  SMTP_USER: Joi.string().allow('').default(''),
+  SMTP_PASS: Joi.string().allow('').default(''),
+  SMTP_SECURE: booleanSchema.default(false),
   PULL_SOURCES_POLL_INTERVAL_MS: Joi.number().integer().min(1).default(300000),
   PULL_SOURCES_SCHEDULER_ENABLED: booleanSchema.default(true),
   APPROVAL_NOTIFICATION_SCHEDULER_ENABLED: booleanSchema.default(true),
@@ -79,12 +94,16 @@ export function getEnvironmentConfig(): IngestionEnvironmentConfig {
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     supabaseNewsArticlesTable: env.SUPABASE_NEWS_ARTICLES_TABLE,
     supabasePullSourcesTable: env.SUPABASE_PULL_SOURCES_TABLE,
-    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
-    telegramAdminChatId: env.TELEGRAM_ADMIN_CHAT_ID,
-    telegramAdminUserIds: env.TELEGRAM_ADMIN_USER_IDS.split(',')
-      .map((id) => id.trim())
-      .filter((id) => id !== ''),
-    telegramPollingEnabled: env.TELEGRAM_POLLING_ENABLED,
+    notificationEmailTo: env.NOTIFICATION_EMAIL_TO,
+    notificationEmailFrom: env.NOTIFICATION_EMAIL_FROM,
+    notificationReviewBaseUrl: env.NOTIFICATION_REVIEW_BASE_URL,
+    notificationJwtSecret: env.NOTIFICATION_JWT_SECRET,
+    notificationJwtTtlSeconds: env.NOTIFICATION_JWT_TTL_SECONDS,
+    smtpHost: env.SMTP_HOST,
+    smtpPort: env.SMTP_PORT,
+    smtpUser: env.SMTP_USER,
+    smtpPass: env.SMTP_PASS,
+    smtpSecure: env.SMTP_SECURE,
     pullSourcesPollIntervalMs: env.PULL_SOURCES_POLL_INTERVAL_MS,
     pullSourcesSchedulerEnabled: env.PULL_SOURCES_SCHEDULER_ENABLED,
     approvalNotificationSchedulerEnabled: env.APPROVAL_NOTIFICATION_SCHEDULER_ENABLED,

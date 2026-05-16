@@ -1,29 +1,29 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { AppModule } from '@ai-news-aggregator/ingestion-microservice/app/app.module';
-import { SupabaseClientProvider } from '@ai-news-aggregator/ingestion-microservice/infrastructure/config/supabase-client.provider';
-import { InMemoryPullSourceRepository } from '@ai-news-aggregator/ingestion-microservice/core/domain/test/mocks/in-memory-pull-source.repository';
+import { ApproveArticleUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/approve-article.use-case';
+import { GetArticlesToNotifyUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/get-articles-to-notify.use-case';
+import { ProcessScheduledPullUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/process-scheduled-pull.use-case';
+import { RejectArticleUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/reject-article.use-case';
+import { SendBatchNotificationUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/send-batch-notification.use-case';
+import { PullSourceExtractorPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/pull-source-extractor.port';
+import { PullSourceRepositoryPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/pull-source-repository.port';
+import { NotificationPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/notification.port';
 import { InMemoryPullSourceExtractor } from '@ai-news-aggregator/ingestion-microservice/core/domain/test/mocks/in-memory-pull-source.extractor';
-import { InMemoryTelegramNotificationRepository } from '@ai-news-aggregator/ingestion-microservice/core/domain/test/mocks/in-memory-telegram-notification.repository';
+import { InMemoryPullSourceRepository } from '@ai-news-aggregator/ingestion-microservice/core/domain/test/mocks/in-memory-pull-source.repository';
+import { InMemoryNotificationRepository } from '@ai-news-aggregator/ingestion-microservice/core/domain/test/mocks/in-memory-notification.repository';
+import { SupabaseClientProvider } from '@ai-news-aggregator/ingestion-microservice/infrastructure/config/supabase-client.provider';
 import {
   InMemoryNewsArticleRepository,
   NewsArticleRepositoryPort,
 } from '@ai-news-aggregator/news-article';
-import { PullSourceRepositoryPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/pull-source-repository.port';
-import { PullSourceExtractorPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/pull-source-extractor.port';
-import { TelegramNotificationPort } from '@ai-news-aggregator/ingestion-microservice/core/domain/ports/telegram-notification.port';
-import { ApproveArticleUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/approve-article.use-case';
-import { RejectArticleUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/reject-article.use-case';
-import { ProcessScheduledPullUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/process-scheduled-pull.use-case';
-import { SendBatchNotificationUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/send-batch-notification.use-case';
-import { GetArticlesToNotifyUseCase } from '@ai-news-aggregator/ingestion-microservice/core/application/use-cases/get-articles-to-notify.use-case';
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 
 export interface IngestionE2eContext {
   app: INestApplication;
   articleRepository: InMemoryNewsArticleRepository;
   pullSourceRepository: InMemoryPullSourceRepository;
   pullSourceExtractor: InMemoryPullSourceExtractor;
-  telegramNotification: InMemoryTelegramNotificationRepository;
+  notification: InMemoryNotificationRepository;
   approveArticle: ApproveArticleUseCase;
   rejectArticle: RejectArticleUseCase;
   processScheduledPull: ProcessScheduledPullUseCase;
@@ -35,7 +35,7 @@ export async function createIngestionE2eApp(): Promise<IngestionE2eContext> {
   const articleRepository = new InMemoryNewsArticleRepository();
   const pullSourceRepository = new InMemoryPullSourceRepository();
   const pullSourceExtractor = new InMemoryPullSourceExtractor();
-  const telegramNotification = new InMemoryTelegramNotificationRepository();
+  const notification = new InMemoryNotificationRepository();
 
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -48,8 +48,8 @@ export async function createIngestionE2eApp(): Promise<IngestionE2eContext> {
     .useValue(pullSourceRepository)
     .overrideProvider(PullSourceExtractorPort)
     .useValue(pullSourceExtractor)
-    .overrideProvider(TelegramNotificationPort)
-    .useValue(telegramNotification)
+    .overrideProvider(NotificationPort)
+    .useValue(notification)
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -67,7 +67,7 @@ export async function createIngestionE2eApp(): Promise<IngestionE2eContext> {
   const sendBatchNotification = new SendBatchNotificationUseCase(
     getArticlesToNotify,
     articleRepository,
-    telegramNotification,
+    notification,
   );
 
   return {
@@ -75,7 +75,7 @@ export async function createIngestionE2eApp(): Promise<IngestionE2eContext> {
     articleRepository,
     pullSourceRepository,
     pullSourceExtractor,
-    telegramNotification,
+    notification,
     approveArticle,
     rejectArticle,
     processScheduledPull,
@@ -90,5 +90,5 @@ export async function resetIngestionE2eContext(
   context.articleRepository.clear();
   context.pullSourceRepository.clear();
   context.pullSourceExtractor.clear();
-  context.telegramNotification.clear();
+  context.notification.clear();
 }

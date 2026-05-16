@@ -1,21 +1,29 @@
-import { ArticleStatus, NewsArticle, InMemoryNewsArticleRepository } from '@ai-news-aggregator/news-article';
-import { InMemoryTelegramNotificationRepository } from '../../domain/test/mocks/in-memory-telegram-notification.repository';
-import { SendBatchNotificationUseCase } from '../use-cases/send-batch-notification.use-case';
-import { GetArticlesToNotifyUseCase } from '../use-cases/get-articles-to-notify.use-case';
+import {
+  ArticleStatus,
+  InMemoryNewsArticleRepository,
+  NewsArticle,
+} from '@ai-news-aggregator/news-article';
 import { SendNotificationError } from '../../domain/errors/send-notification.error';
-import { TelegramNotificationPort } from '../../domain/ports/telegram-notification.port';
+import { NotificationPort } from '../../domain/ports/notification.port';
+import { InMemoryNotificationRepository } from '../../domain/test/mocks/in-memory-notification.repository';
+import { GetArticlesToNotifyUseCase } from '../use-cases/get-articles-to-notify.use-case';
+import { SendBatchNotificationUseCase } from '../use-cases/send-batch-notification.use-case';
 
 describe('SendBatchNotificationUseCase', () => {
   let useCase: SendBatchNotificationUseCase;
   let articleRepository: InMemoryNewsArticleRepository;
-  let telegramNotification: InMemoryTelegramNotificationRepository;
+  let notification: InMemoryNotificationRepository;
   let getArticlesToNotify: GetArticlesToNotifyUseCase;
 
   beforeEach(() => {
     articleRepository = new InMemoryNewsArticleRepository();
-    telegramNotification = new InMemoryTelegramNotificationRepository();
+    notification = new InMemoryNotificationRepository();
     getArticlesToNotify = new GetArticlesToNotifyUseCase(articleRepository);
-    useCase = new SendBatchNotificationUseCase(getArticlesToNotify, articleRepository, telegramNotification);
+    useCase = new SendBatchNotificationUseCase(
+      getArticlesToNotify,
+      articleRepository,
+      notification,
+    );
   });
 
   describe('execute', () => {
@@ -31,7 +39,7 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       const article2 = new NewsArticle(
@@ -45,7 +53,7 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(article1);
@@ -53,7 +61,7 @@ describe('SendBatchNotificationUseCase', () => {
 
       await useCase.execute();
 
-      const lastNotification = telegramNotification.getLastNotification();
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification).not.toBeNull();
       expect(lastNotification?.length).toBe(2);
     });
@@ -70,7 +78,7 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(article);
@@ -93,7 +101,7 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         true,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       const unnotifiedArticle = new NewsArticle(
@@ -107,15 +115,15 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(notifiedArticle);
       await articleRepository.save(unnotifiedArticle);
 
       await useCase.execute();
-      
-      const lastNotification = telegramNotification.getLastNotification();
+
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification?.length).toBe(1);
       expect(lastNotification?.[0].articleId).toBe('article-2');
     });
@@ -132,7 +140,7 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       const approvedArticle = new NewsArticle(
@@ -146,29 +154,29 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.APPROVED,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(candidateArticle);
       await articleRepository.save(approvedArticle);
 
       await useCase.execute();
-      
-      const lastNotification = telegramNotification.getLastNotification();
+
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification?.length).toBe(1);
     });
 
     it('should do nothing when there are no articles', async () => {
       await useCase.execute();
 
-      const lastNotification = telegramNotification.getLastNotification();
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification).toBeNull();
     });
 
     it('should do nothing when there are no unnotified CANDIDATE articles', async () => {
       await useCase.execute();
 
-      const lastNotification = telegramNotification.getLastNotification();
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification).toBeNull();
     });
 
@@ -184,20 +192,20 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(article);
 
       await useCase.execute();
 
-      const lastNotification = telegramNotification.getLastNotification();
+      const lastNotification = notification.getLastNotification();
       expect(lastNotification?.[0]).toEqual({
         articleId: 'article-1',
         title: 'Test Article Title',
         articleUrl: 'https://example.com/article-1',
         mainImageUrl: 'https://example.com/image.jpg',
-        originalAuthor: 'Test Author'
+        originalAuthor: 'Test Author',
       });
     });
 
@@ -213,22 +221,30 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(article);
 
-      class FailingTelegramNotificationRepository implements TelegramNotificationPort {
+      class FailingNotificationRepository implements NotificationPort {
         async sendBatchNotification(): Promise<void> {
-          throw new Error('Telegram API failed');
+          throw new Error('Notification provider failed');
         }
       }
 
-      const failingNotification = new FailingTelegramNotificationRepository();
-      const failingUseCase = new SendBatchNotificationUseCase(getArticlesToNotify, articleRepository, failingNotification);
+      const failingNotification = new FailingNotificationRepository();
+      const failingUseCase = new SendBatchNotificationUseCase(
+        getArticlesToNotify,
+        articleRepository,
+        failingNotification,
+      );
 
-      await expect(failingUseCase.execute()).rejects.toThrow(SendNotificationError);
-      await expect(failingUseCase.execute()).rejects.toThrow('Failed to send notification: Telegram API failed');
+      await expect(failingUseCase.execute()).rejects.toThrow(
+        SendNotificationError,
+      );
+      await expect(failingUseCase.execute()).rejects.toThrow(
+        'Failed to send notification: Notification provider failed',
+      );
     });
 
     it('should not mark articles as notified when notification fails', async () => {
@@ -243,19 +259,23 @@ describe('SendBatchNotificationUseCase', () => {
         ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
-        new Date('2024-01-01T00:00:00Z')
+        new Date('2024-01-01T00:00:00Z'),
       );
 
       await articleRepository.save(article);
 
-      class FailingTelegramNotificationRepository implements TelegramNotificationPort {
+      class FailingNotificationRepository implements NotificationPort {
         async sendBatchNotification(): Promise<void> {
-          throw new Error('Telegram API failed');
+          throw new Error('Notification provider failed');
         }
       }
 
-      const failingNotification = new FailingTelegramNotificationRepository();
-      const failingUseCase = new SendBatchNotificationUseCase(getArticlesToNotify, articleRepository, failingNotification);
+      const failingNotification = new FailingNotificationRepository();
+      const failingUseCase = new SendBatchNotificationUseCase(
+        getArticlesToNotify,
+        articleRepository,
+        failingNotification,
+      );
 
       try {
         await failingUseCase.execute();

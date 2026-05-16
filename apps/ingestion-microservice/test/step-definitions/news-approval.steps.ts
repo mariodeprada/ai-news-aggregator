@@ -62,7 +62,7 @@ Given(
 Given(
   'the administrator is a valid one',
   async function (this: NewsApprovalWorld) {
-    // The Telegram polling adapter validates admins at the infrastructure boundary.
+    // Reviewer authentication is enforced at the HTTP boundary.
     // These approval use-case scenarios exercise only the domain transition.
   },
 );

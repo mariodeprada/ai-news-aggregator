@@ -12,7 +12,7 @@ An Enterprise-grade automated news aggregator and AI-powered editorial system. B
 
 This monorepo orchestrates three decoupled NestJS microservices that coordinate through persisted state in Supabase/PostgreSQL. Each downstream microservice polls the shared database for rows that became ready in the previous stage.
 
-1. **📥 Ingestion Microservice**: Runs scheduled background jobs that reactively consume RSS feeds and periodically scrape configured HTML sources from Supabase/PostgreSQL (using HTTP fetch + Cheerio). Filters candidate articles and sends batch notifications via Telegram Bot for Human-in-the-Loop approval flow.
+1. **📥 Ingestion Microservice**: Runs scheduled background jobs that reactively consume RSS feeds and periodically scrape configured HTML sources from Supabase/PostgreSQL (using HTTP fetch + Cheerio). Filters candidate articles and sends batch email notifications for Human-in-the-Loop approval flow.
 2. **🤖 Agentic Generation Microservice**: Powered by LangGraph and cost-efficient LLMs (GPT-4o-mini / Gemini 1.5 Flash). Polls approved articles from the shared database and runs them through an AI editorial room with two autonomous agents: a _Writer Agent_ (content generation) and a _Reviewer Agent_ (SEO and editorial guidelines enforcement).
 3. **🚀 Publishing Microservice**: Polls approved editorial content from the shared database and publishes it to external CMS platforms (e.g., WordPress REST API) with rich metadata.
 
@@ -21,7 +21,7 @@ This monorepo orchestrates three decoupled NestJS microservices that coordinate 
 - **Framework:** NestJS (TypeScript) inside an **Nx Monorepo**.
 - **Architecture:** Hexagonal Architecture (Ports and Adapters) & Domain-Driven Design (DDD).
 - **Communication:** DB polling between bounded contexts using persisted status transitions.
-- **Scheduling:** **@nestjs/schedule** for cron-based background jobs (pull sources, notifications, approval polling).
+- **Scheduling:** **@nestjs/schedule** for cron-based background jobs (pull sources and notifications).
 - **Database:** **Supabase** (PostgreSQL) for state management and immutable backups.
 - **AI Orchestration:** **LangGraph** (TypeScript ecosystem) generating Structured Outputs (JSON).
 - **Deployment:** Hosted on **Railway** as continuous background worker processes.
@@ -144,34 +144,34 @@ PULL_SOURCES_POLL_INTERVAL_MS=300000
 PULL_SOURCES_SCHEDULER_ENABLED=true
 \`\`\`
 
-### Telegram Bot
+### Approval Email Review
 
-The ingestion microservice sends approval notifications through Telegram using
-a scheduled scheduler. The notification process runs every hour (configurable)
-and sends batches of pending candidate articles to the configured admin chat.
+The ingestion microservice sends approval notifications through HTML email.
+Each batch includes a signed review link backed by a JWT. Reviewers open the
+link, see a server-rendered checklist, and can approve or reject multiple
+articles in one action.
 
 Required env vars:
 
 ```bash
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_ADMIN_CHAT_ID=<telegram-chat-id>
-TELEGRAM_ADMIN_USER_IDS=<telegram-user-id>,<telegram-user-id>
+NOTIFICATION_EMAIL_TO=editor@example.com
+NOTIFICATION_EMAIL_FROM=bot@example.com
+NOTIFICATION_REVIEW_BASE_URL=https://your-host
+NOTIFICATION_JWT_SECRET=...
+NOTIFICATION_JWT_TTL_SECONDS=86400
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_SECURE=false
 ```
-
-Backward compatibility:
-
-- `TELEGRAM_ADMIN_USER_IDS` is the preferred setting.
-- `TELEGRAM_ADMIN_USER_ID` is still accepted as fallback for a single admin.
-
-The approval/rejection flow is handled through Telegram inline buttons that
-trigger use cases directly within the microservice.
 
 ## 🛡️ Architectural Decisions
 
 - **DB Polling Between Micros:** The cross-microservice contract is persisted state, not message queues or HTTP calls. Ingestion leaves `NewsArticle` rows in `APPROVED`, Agents leaves `EditorialContent` rows in `APPROVED_BY_AGENT`, and Publishing polls those repositories on a schedule.
 - **Hexagonal Isolation:** The core domain is strictly framework-agnostic. Swapping Supabase for MongoDB or WordPress for a social media integration requires zero changes to the core business rules.
 - **Hybrid LLM Strategy:** Leverages small, fast, and cheap models tuned for structured outputs to handle massive text processing economically, saving larger models only for complex reasoning tasks.
-- **Scheduled Jobs:** All background processes (RSS/HTML pulling, Telegram notifications, article approval polling) use @nestjs/schedule instead of message queues for simplicity and direct database coordination.
+- **Scheduled Jobs:** All background processes (RSS/HTML pulling and email notifications) use @nestjs/schedule instead of message queues for simplicity and direct database coordination.
 
 ## 📊 Database Schema
 
@@ -188,7 +188,7 @@ Managed by ingestion-microservice, consumed by agents-microservice.
 | `original_author` | TEXT | Original author name |
 | `source_id` | TEXT | Source identifier |
 | `status` | TEXT | CANDIDATE, APPROVED, REJECTED |
-| `notified` | BOOLEAN | Telegram notification sent |
+| `notified` | BOOLEAN | Approval email sent |
 | `pending_generation` | BOOLEAN | **Agents polling flag** - true when APPROVED and waiting for AI generation |
 
 ### editorial_contents (agents → publishing)
@@ -255,10 +255,17 @@ SUPABASE_PULL_SOURCES_TABLE=pull_sources
 PULL_SOURCES_POLL_INTERVAL_MS=300000
 PULL_SOURCES_SCHEDULER_ENABLED=true
 
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_ADMIN_CHAT_ID=<telegram-chat-id>
-TELEGRAM_ADMIN_USER_IDS=<telegram-user-id>,<telegram-user-id>
+# Email Review
+NOTIFICATION_EMAIL_TO=editor@example.com
+NOTIFICATION_EMAIL_FROM=bot@example.com
+NOTIFICATION_REVIEW_BASE_URL=https://your-host
+NOTIFICATION_JWT_SECRET=...
+NOTIFICATION_JWT_TTL_SECONDS=86400
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_SECURE=false
 \`\`\`
 
 ### Agents Microservice

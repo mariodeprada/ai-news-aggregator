@@ -5,6 +5,7 @@
 
 import { Logger, LogLevel } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { urlencoded } from 'express';
 import { AppModule } from './app/app.module';
 import { getEnvironmentConfig } from './infrastructure/config/environment.config';
 
@@ -16,6 +17,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: logLevels,
   });
+  app.use(urlencoded({ extended: true }));
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
   const port = getEnvironmentConfig().port;
