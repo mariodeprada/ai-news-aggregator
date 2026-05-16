@@ -1,330 +1,368 @@
-# 📰 AI News Aggregator (Enterprise Backend)
+# AI News Aggregator 📰
 
-![Status](https://img.shields.io/badge/Status-WIP-orange?style=for-the-badge)
 ![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
 ![Nx](https://img.shields.io/badge/Nx-143055?style=for-the-badge&logo=nx&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Railway](https://img.shields.io/badge/Railway-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![WordPress](https://img.shields.io/badge/WordPress-21759B?style=for-the-badge&logo=wordpress&logoColor=white)
+![Cucumber](https://img.shields.io/badge/Cucumber-23D96C?style=for-the-badge&logo=cucumber&logoColor=white)
 
-An Enterprise-grade automated news aggregator and AI-powered editorial system. Built with Domain-Driven Design (DDD) and Hexagonal Architecture inside an Nx monorepo.
+This repository implements a complete backend pipeline for discovering news, reviewing it, enriching it with AI, and publishing it to a CMS.
 
-## 🧠 System Architecture
+The system is built as three NestJS microservices inside an Nx monorepo. They do not talk to each other through queues or direct HTTP calls. Instead, they coordinate through persisted state in Supabase. That keeps the runtime model simple: each service is responsible for one stage of the workflow, and the next service polls the database when the previous stage has left an article ready.
 
-This monorepo orchestrates three decoupled NestJS microservices that coordinate through persisted state in Supabase/PostgreSQL. Each downstream microservice polls the shared database for rows that became ready in the previous stage.
+At a business level, the flow is:
 
-1. **📥 Ingestion Microservice**: Runs scheduled background jobs that reactively consume RSS feeds and periodically scrape configured HTML sources from Supabase/PostgreSQL (using HTTP fetch + Cheerio). Filters candidate articles and sends batch email notifications for Human-in-the-Loop approval flow.
-2. **🤖 Agentic Generation Microservice**: Powered by LangGraph and cost-efficient LLMs (GPT-4o-mini / Gemini 1.5 Flash). Polls approved articles from the shared database and runs them through an AI editorial room with two autonomous agents: a _Writer Agent_ (content generation) and a _Reviewer Agent_ (SEO and editorial guidelines enforcement).
-3. **🚀 Publishing Microservice**: Polls approved editorial content from the shared database and publishes it to external CMS platforms (e.g., WordPress REST API) with rich metadata.
+1. sources are polled
+2. raw articles are stored as candidates
+3. an administrator reviews them by email
+4. approved articles are summarized by AI
+5. summarized articles are published to WordPress
 
-## 🛠️ Tech Stack & Patterns
+That makes the repo useful for two different things:
 
-- **Framework:** NestJS (TypeScript) inside an **Nx Monorepo**.
-- **Architecture:** Hexagonal Architecture (Ports and Adapters) & Domain-Driven Design (DDD).
-- **Communication:** DB polling between bounded contexts using persisted status transitions.
-- **Scheduling:** **@nestjs/schedule** for cron-based background jobs (pull sources and notifications).
-- **Database:** **Supabase** (PostgreSQL) for state management and immutable backups.
-- **AI Orchestration:** **LangGraph** (TypeScript ecosystem) generating Structured Outputs (JSON).
-- **Deployment:** Hosted on **Railway** as continuous background worker processes.
+- as a real implementation of a staged content pipeline
+- as a reference for a small DDD / hexagonal monorepo where each bounded context stays operationally simple
 
-## 🚀 Getting Started
+## End-to-end flow 🔄
 
-### Prerequisites
+### 1. Ingestion 📥
 
-- Node.js (v18+)
-- Supabase project URL and keys
-- OpenAI / Google Gemini API keys
+`ingestion-microservice` polls configured RSS and HTML sources from Supabase, extracts article data, stores new rows in `news_articles`, and leaves them in `CANDIDATE`.
 
-### Installation & Execution
+It also sends batch approval emails. Those emails contain a signed review link backed by JWT, so an administrator can approve or reject multiple candidate articles from a server-rendered review page.
 
-```bash
+### 2. AI summarization 🤖
 
-# Install dependencies
+`agents-microservice` polls `APPROVED` articles that still do not have `generated_summary`.
 
-npm install
+It runs an LLM-based summarization workflow and persists the generated summary back into the same `news_articles` row. The rest of the system only sees the observable outcome: an approved article that is now summarized.
 
-# Setup environment variables
+### 3. Publishing 🚀
 
-# The repo already includes a .env file you can edit locally.
+`publishing-microservice` polls summarized approved articles and due CMS configurations from the `cms` table.
 
-# Run microservices locally via Nx
+Right now the only supported CMS type is WordPress. The service publishes the generated summary together with a link to the original article, then marks the article as `PUBLISHED`.
 
-npx nx serve ingestion-microservice
-npx nx serve agents-microservice
-npx nx serve publishing-microservice
+## Repository shape 🧱
+
+The monorepo currently contains:
+
+- `apps/ingestion-microservice`
+- `apps/ingestion-microservice-e2e`
+- `apps/agents-microservice`
+- `apps/agents-microservice-e2e`
+- `apps/publishing-microservice`
+- `apps/publishing-microservice-e2e`
+- `libs/news-article`
+
+`libs/news-article` is the shared domain and persistence library used by all three services. It holds the `NewsArticle` aggregate, the shared repository port, the in-memory test repo, and the Supabase adapter.
+
+## Monorepo layout 🗂️
+
+```text
+apps/
+  ingestion-microservice
+  ingestion-microservice-e2e
+  agents-microservice
+  agents-microservice-e2e
+  publishing-microservice
+  publishing-microservice-e2e
+libs/
+  news-article
 ```
 
-## 📦 NPM Scripts (Ingestion Microservice)
+## Architecture 🏗️
 
-For simplified development workflow, the following NPM scripts are available in the root `package.json`:
+All three services use the same shape:
 
-### Build & Start
-```bash
-npm run build:ingestion          # Build the microservice for production
-npm run start:ingestion          # Build + start in production mode
-npm run dev:ingestion            # Development mode with hot-reload
+- hexagonal core with ports and use cases
+- infrastructure adapters for Supabase, email, LLM, or CMS
+- scheduled polling with `@nestjs/schedule`
+- unit tests
+- Cucumber integration tests inside each microservice
+- Jest e2e tests in a sibling `*-e2e` app
+
+The integration contract between microservices is the shared `news_articles` table.
+
+## Article lifecycle 🧭
+
+Current `ArticleStatus` values in code:
+
+- `CANDIDATE`
+- `APPROVED`
+- `REJECTED`
+- `PUBLISHED`
+
+Effective pipeline:
+
+1. ingestion creates `CANDIDATE` articles
+2. approval flow changes them to `APPROVED` or `REJECTED`
+3. agents summarize `APPROVED` articles without `generated_summary`
+4. publishing publishes summarized `APPROVED` articles and marks them `PUBLISHED`
+
+## Real database model 🗄️
+
+### `news_articles` 📰
+
+This is the central table used across the whole pipeline.
+
+Expected columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text / uuid | primary identifier |
+| `article_url` | text | original source URL |
+| `title` | text | original title |
+| `content` | text | original body |
+| `author` | text | original author |
+| `main_image_url` | text nullable | source image |
+| `pull_source_id` | text | source configuration id |
+| `status` | text | `CANDIDATE`, `APPROVED`, `REJECTED`, `PUBLISHED` |
+| `notified` | boolean | approval email already sent |
+| `generated_summary` | text nullable | summary generated by `agents` |
+| `created_at` | timestamptz | creation time |
+| `updated_at` | timestamptz | last mutation |
+
+### `pull_sources` 🌐
+
+Used by `ingestion-microservice`.
+
+Expected columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text | source id |
+| `type` | text | `rss` or `html` |
+| `source_url` | text | URL to poll |
+| `class_identifiers` | jsonb nullable | required for `html` sources |
+| `last_polled_at` | timestamptz nullable | last polling timestamp |
+| `is_active` | boolean | source enabled |
+
+For HTML sources, `class_identifiers` is expected to contain:
+
+```json
+{
+  "title": "...",
+  "content": "...",
+  "mainImageUrl": "...",
+  "originalAuthor": "...",
+  "createdAt": "..."
+}
 ```
 
-### Testing
+### `cms` 🧩
+
+Used by `publishing-microservice`.
+
+Expected columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text | cms id |
+| `type` | text | currently only `wordpress` |
+| `base_url` | text | base site URL |
+| `username` | text | WordPress username |
+| `credentials_ref` | text | reference used to resolve the WordPress application password from environment |
+| `last_published_at` | timestamptz nullable | last publication cycle |
+| `is_active` | boolean | cms enabled |
+
+## Environment variables 🔐
+
+Everything is loaded from the root `.env`.
+
+### Shared Supabase 🟢
+
 ```bash
-npm run test:ingestion           # Run unit tests (123 tests)
-npm run test:ingestion:watch     # Run tests in watch mode
-npm run test:ingestion:coverage  # Run tests with coverage report
-npm run e2e:ingestion            # Run E2E integration tests (3 tests)
-npm run e2e:ingestion:watch      # Run E2E tests in watch mode
-```
-
-### Linting & BDD
-```bash
-npm run lint:ingestion           # Run ESLint on the codebase
-npm run cucumber:ingestion       # Run BDD tests with Cucumber (3 feature files)
-```
-
-### Global Commands (All Microservices)
-```bash
-npm run build:all                # Build all projects in the monorepo
-npm run test:all                 # Run tests for all projects
-npm run e2e:all                  # Run E2E tests for all projects
-```
-
-### Recommended Workflows
-
-**Daily Development:**
-```bash
-npm run dev:ingestion            # Start dev server with hot-reload
-npm run test:ingestion:watch     # Auto-rerun tests on file changes
-```
-
-**Pre-Commit:**
-```bash
-npm run test:ingestion           # Quick unit tests
-npm run lint:ingestion           # Code linting
-```
-
-**Pre-Deploy:**
-```bash
-npm run build:ingestion          # Production build
-npm run e2e:ingestion            # Full E2E test suite
-```
-
-### Ingestion Pull Sources
-
-Pull sources are configured in the database, not sent to the service through an
-HTTP endpoint. The ingestion microservice runs a background scheduler every
-`PULL_SOURCES_POLL_INTERVAL_MS` milliseconds, loads enabled due rows from the
-`pull_sources` table and extracts article data using the configured selectors.
-
-Default Supabase tables:
-
-- `news_articles`: persisted candidate/approved/rejected articles.
-- `pull_sources`: persisted polling configuration.
-
-`pull_sources` expected columns:
-
-| Column | Example |
-|---|---|
-| `id` | `techcrunch-ai` |
-| `source_url` | `https://techcrunch.com/category/artificial-intelligence/` |
-| `title_selector` | `h1` |
-| `link_selector` | `link[rel="canonical"]` |
-| `content_selector` | `article` |
-| `main_image_url_selector` | `meta[property="og:image"]` |
-| `original_author_selector` | `.byline a` |
-| `enabled` | `true` |
-| `check_interval_seconds` | `900` |
-| `last_checked_at` | `null` |
-
-Relevant env vars:
-
-\`\`\`bash
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_NEWS_ARTICLES_TABLE=news_articles
+```
+
+### Ingestion 📥
+
+```bash
+PORT=3000
 SUPABASE_PULL_SOURCES_TABLE=pull_sources
+
 PULL_SOURCES_POLL_INTERVAL_MS=300000
 PULL_SOURCES_SCHEDULER_ENABLED=true
-\`\`\`
+APPROVAL_NOTIFICATION_SCHEDULER_ENABLED=true
 
-### Approval Email Review
-
-The ingestion microservice sends approval notifications through HTML email.
-Each batch includes a signed review link backed by a JWT. Reviewers open the
-link, see a server-rendered checklist, and can approve or reject multiple
-articles in one action.
-
-Required env vars:
-
-```bash
 NOTIFICATION_EMAIL_TO=editor@example.com
 NOTIFICATION_EMAIL_FROM=bot@example.com
-NOTIFICATION_REVIEW_BASE_URL=https://your-host
-NOTIFICATION_JWT_SECRET=...
+NOTIFICATION_REVIEW_BASE_URL=http://localhost:3000
+NOTIFICATION_JWT_SECRET=replace-me
 NOTIFICATION_JWT_TTL_SECONDS=86400
+
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...
+SMTP_USER=username
+SMTP_PASS=password
 SMTP_SECURE=false
 ```
 
-## 🛡️ Architectural Decisions
+### Agents 🤖
 
-- **DB Polling Between Micros:** The cross-microservice contract is persisted state, not message queues or HTTP calls. Ingestion leaves `NewsArticle` rows in `APPROVED`, Agents leaves `EditorialContent` rows in `APPROVED_BY_AGENT`, and Publishing polls those repositories on a schedule.
-- **Hexagonal Isolation:** The core domain is strictly framework-agnostic. Swapping Supabase for MongoDB or WordPress for a social media integration requires zero changes to the core business rules.
-- **Hybrid LLM Strategy:** Leverages small, fast, and cheap models tuned for structured outputs to handle massive text processing economically, saving larger models only for complex reasoning tasks.
-- **Scheduled Jobs:** All background processes (RSS/HTML pulling and email notifications) use @nestjs/schedule instead of message queues for simplicity and direct database coordination.
+```bash
+PORT=3001
+ARTICLE_SUMMARIZATION_SCHEDULER_ENABLED=true
 
-## 📊 Database Schema
-
-### news_articles (ingestion → agents)
-Managed by ingestion-microservice, consumed by agents-microservice.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `title` | TEXT | Article title |
-| `article_url` | TEXT | Original article URL |
-| `content` | TEXT | Article content |
-| `main_image_url` | TEXT | Main image URL |
-| `original_author` | TEXT | Original author name |
-| `source_id` | TEXT | Source identifier |
-| `status` | TEXT | CANDIDATE, APPROVED, REJECTED |
-| `notified` | BOOLEAN | Approval email sent |
-| `pending_generation` | BOOLEAN | **Agents polling flag** - true when APPROVED and waiting for AI generation |
-
-### editorial_contents (agents → publishing)
-Created by agents-microservice, consumed by publishing-microservice.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `source_article_id` | UUID | FK to news_articles |
-| `source_title` | TEXT | Original article title |
-| `source_content` | TEXT | Original article content |
-| `main_image_url` | TEXT | Image URL |
-| `original_author` | TEXT | Original author |
-| `generated_title` | TEXT | AI-generated title |
-| `generated_summary` | TEXT | AI-generated summary |
-| `status` | TEXT | PENDING, GENERATING, REVIEWING, APPROVED_BY_AGENT, FAILED |
-| `rewrite_attempts` | INTEGER | Number of rewrite attempts |
-| `pending_publication` | BOOLEAN | **Publishing polling flag** - true when APPROVED_BY_AGENT |
-
-### published_articles (publishing output)
-Created by publishing-microservice for tracking.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `source_content_id` | UUID | FK to editorial_contents |
-| `generated_title` | TEXT | Published title |
-| `generated_summary` | TEXT | Published content |
-| `main_image_url` | TEXT | Image URL |
-| `original_author` | TEXT | Original author |
-| `target` | TEXT | WORDPRESS |
-| `status` | TEXT | PENDING, PUBLISHING, PUBLISHED, FAILED |
-| `external_id` | TEXT | External CMS post ID |
-| `attempts` | INTEGER | Publishing attempts |
-
-### pull_sources (ingestion configuration)
-Configuration for pull-based sources (HTML scraping).
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | TEXT | Unique identifier |
-| `source_url` | TEXT | URL to scrape |
-| `title_selector` | TEXT | CSS selector for title |
-| `link_selector` | TEXT | CSS selector for canonical link |
-| `content_selector` | TEXT | CSS selector for content |
-| `main_image_url_selector` | TEXT | CSS selector for image |
-| `original_author_selector` | TEXT | CSS selector for author |
-| `enabled` | BOOLEAN | Enable/disable source |
-| `check_interval_seconds` | INTEGER | Polling interval |
-| `last_checked_at` | TIMESTAMPTZ | Last check timestamp |
-
-## 🔧 Environment Variables
-
-### Ingestion Microservice
-
-\`\`\`bash
-# Supabase
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_NEWS_ARTICLES_TABLE=news_articles
-SUPABASE_PULL_SOURCES_TABLE=pull_sources
-
-# Scheduler
-PULL_SOURCES_POLL_INTERVAL_MS=300000
-PULL_SOURCES_SCHEDULER_ENABLED=true
-
-# Email Review
-NOTIFICATION_EMAIL_TO=editor@example.com
-NOTIFICATION_EMAIL_FROM=bot@example.com
-NOTIFICATION_REVIEW_BASE_URL=https://your-host
-NOTIFICATION_JWT_SECRET=...
-NOTIFICATION_JWT_TTL_SECONDS=86400
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...
-SMTP_SECURE=false
-\`\`\`
-
-### Agents Microservice
-
-\`\`\`bash
-# Supabase
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_NEWS_ARTICLES_TABLE=news_articles
-SUPABASE_EDITORIAL_CONTENTS_TABLE=editorial_contents
-
-# Scheduler
-APPROVED_ARTICLES_POLL_INTERVAL_MS=60000
-APPROVED_ARTICLES_SCHEDULER_ENABLED=true
-
-# LLM Configuration
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
-GOOGLE_API_KEY=...
-GOOGLE_MODEL=gemini-1.5-flash
-LLM_PROVIDER=openai
-\`\`\`
-
-### Publishing Microservice
-
-\`\`\`bash
-# Supabase
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_EDITORIAL_CONTENTS_TABLE=editorial_contents
-SUPABASE_PUBLISHED_ARTICLES_TABLE=published_articles
-
-# Scheduler
-APPROVED_CONTENT_POLL_INTERVAL_MS=60000
-APPROVED_CONTENT_SCHEDULER_ENABLED=true
-
-# WordPress CMS
-WORDPRESS_URL=https://your-wordpress-site.com
-WORDPRESS_USERNAME=your_username
-WORDPRESS_APPLICATION_PASSWORD=your_app_password
-\`\`\`
-
-## 📦 Running Migrations
-
-SQL migrations should be applied to your Supabase database in order:
-
-```bash
-# Via Supabase CLI
-supabase db push
-
-# Or manually via psql
-psql -h db.xxx.supabase.co -U postgres -d postgres -f 001_add_pending_generation_to_news_articles.sql
-psql -h db.xxx.supabase.co -U postgres -d postgres -f 002_create_editorial_contents_table.sql
-psql -h db.xxx.supabase.co -U postgres -d postgres -f 003_create_published_articles_table.sql
+AGENTS_SUMMARY_MODEL=gpt-4o-mini
+AGENTS_SUMMARY_WRITER_SYSTEM_PROMPT=...
+AGENTS_SUMMARY_REVIEWER_SYSTEM_PROMPT=...
 ```
 
-Required tables:
+### Publishing 🚀
 
-- `news_articles`: managed by ingestion-microservice, consumed by agents-microservice
-- `editorial_contents`: created by agents-microservice, consumed by publishing-microservice
-- `published_articles`: created by publishing-microservice for tracking
-- `pull_sources`: configuration for pull-based sources (HTML scraping)
+```bash
+PORT=3002
+SUPABASE_CMS_TABLE=cms
+PUBLISH_ARTICLES_SCHEDULER_ENABLED=true
+
+# example for a cms row with credentials_ref=wordpress_main
+CMS_WORDPRESS_MAIN_APPLICATION_PASSWORD=your_wordpress_app_password
+```
+
+WordPress credentials are not stored in the `cms` table. The table stores a `credentials_ref`, and the runtime resolves the actual secret from environment variables such as `CMS_WORDPRESS_MAIN_APPLICATION_PASSWORD`.
+
+## Runtime ports 🔌
+
+- ingestion: `3000`
+- agents: `3001`
+- publishing: `3002`
+
+## Root npm scripts 🛠️
+
+### Ingestion 📥
+
+```bash
+npm run build:ingestion
+npm run start:ingestion
+npm run dev:ingestion
+npm run test:ingestion
+npm run test:ingestion:watch
+npm run test:ingestion:coverage
+npm run cucumber:ingestion
+npm run e2e:ingestion
+```
+
+### Agents 🤖
+
+```bash
+npm run build:agents
+npm run start:agents
+npm run dev:agents
+npm run test:agents
+npm run test:agents:watch
+npm run test:agents:coverage
+npm run cucumber:agents
+npm run e2e:agents
+```
+
+### Publishing 🚀
+
+```bash
+npm run build:publishing
+npm run start:publishing
+npm run dev:publishing
+npm run test:publishing
+npm run test:publishing:watch
+npm run test:publishing:coverage
+npm run cucumber:publishing
+npm run e2e:publishing
+```
+
+### Whole repo 🧪
+
+```bash
+npm run build:all
+npm run test:all
+npm run e2e:all
+```
+
+## Local development 💻
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the three services in separate terminals:
+
+```bash
+npm run dev:ingestion
+npm run dev:agents
+npm run dev:publishing
+```
+
+Or run built versions with `.env` loaded:
+
+```bash
+npm run start:ingestion
+npm run start:agents
+npm run start:publishing
+```
+
+## Test layers ✅
+
+Each microservice has three layers of verification:
+
+1. unit tests via `nx test`
+2. Cucumber integration tests via `nx run <project>:test:e2e`
+3. Jest e2e tests via `nx e2e <project>-e2e`
+
+Current features in the repo:
+
+- ingestion
+  - pull ingestion
+  - news approval
+  - approval notification
+- agents
+  - news article summary generation
+- publishing
+  - publish article
+  - scheduled publication
+
+## Implementation details by service 🔍
+
+### Ingestion 📥
+
+- pull source entities:
+  - `RssPullSource`
+  - `HtmlPullSource`
+- HTML extraction uses Cheerio
+- notifications are sent by email
+- review links are protected by JWT
+- review happens in a server-rendered HTML page at `/api/review`
+
+### Agents 🤖
+
+- reads approved articles from `news_articles`
+- generates summaries through a LangGraph-based adapter
+- uses OpenAI through `@langchain/openai`
+- stores the generated summary directly in the shared article record
+
+### Publishing 🚀
+
+- reads due CMS configurations from `cms`
+- reads summarized approved articles from `news_articles`
+- publishes to WordPress via `POST /wp-json/wp/v2/posts`
+- publishes the generated summary plus a link to the original article
+
+## What is not in this repo 🚫
+
+The repo does not currently implement:
+
+- message queues between microservices
+- a separate `editorial_contents` bounded context
+- a separate `published_articles` tracking table
+- a multi-provider CMS strategy beyond WordPress
+
+## Notes 📝
+
+- The schedulers are polling workers, not request/response APIs.
+- The microservices coordinate through persisted state in Supabase.
+- The `README` is intentionally based on the code that exists today.

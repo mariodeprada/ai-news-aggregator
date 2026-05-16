@@ -91,13 +91,23 @@ describe('ProcessScheduledPullUseCase', () => {
       await pullSourceRepository.save(source1);
       await pullSourceRepository.save(source2);
 
-      extractor.setError('SOURCE_EXTRACTION_ERROR: Failed');
+      extractor.setErrorForSource('source-1', 'SOURCE_EXTRACTION_ERROR: Failed');
+      extractor.setArticlesToReturn([
+        {
+          title: 'New Article',
+          content: 'Content',
+          mainImageUrl: 'https://example.com/image.jpg',
+          originalAuthor: 'Author',
+          articleUrl: 'https://example.com/article',
+          createdAt: new Date('2024-01-01T00:30:00Z')
+        }
+      ]);
 
       const result = await useCase.execute();
 
-      expect(result.errors.length).toBe(2);
+      expect(result.errors.length).toBe(1);
       expect(result.errors.map(e => e.sourceId)).toContain('source-1');
-      expect(result.errors.map(e => e.sourceId)).toContain('source-2');
+      expect(result.success).toContain('source-2');
     });
 
     it('should update lastPolledAt for all processed sources', async () => {

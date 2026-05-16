@@ -17,107 +17,101 @@ describe('Approval Notification E2E', () => {
     await context.app.close();
   });
 
-  describe('Sending a batch notification for pending candidates', () => {
-    it('should send notification for unnotified CANDIDATE articles', async () => {
-      const articles: NewsArticle[] = [];
+  it('Sending a batch notification for pending candidates', async () => {
+    const articles: NewsArticle[] = [];
 
-      for (let i = 0; i < 5; i++) {
-        const article = new NewsArticle(
-          `article-${i}`,
-          `https://example.com/article-${i}`,
-          `Article ${i + 1}`,
-          `Content ${i + 1}`,
-          `Author ${i + 1}`,
-          `https://example.com/image${i}.jpg`,
-          'source-1',
-          ArticleStatus.CANDIDATE,
-          false,
-          new Date('2024-01-01T00:00:00Z'),
-          new Date('2024-01-01T00:00:00Z'),
-        );
-        articles.push(article);
-        await context.articleRepository.save(article);
-      }
-
-      for (let i = 0; i < 2; i++) {
-        articles[i].notify();
-        await context.articleRepository.update(articles[i]);
-      }
-
-      await context.sendBatchNotification.execute();
-
-      const lastNotification = context.notification.getLastNotification();
-      expect(lastNotification).not.toBeNull();
-      expect(lastNotification?.length).toBe(3);
-
-      const allArticles = await context.articleRepository.find();
-      const notifiedArticles = allArticles.filter((a) => a.notified);
-      expect(notifiedArticles.length).toBeGreaterThanOrEqual(3);
-    });
-  });
-
-  describe('No notification sent when all candidates are already notified', () => {
-    it('should skip notification when all articles are notified', async () => {
-      for (let i = 0; i < 2; i++) {
-        const article = new NewsArticle(
-          `article-${i}`,
-          `https://example.com/article-${i}`,
-          `Article ${i + 1}`,
-          `Content ${i + 1}`,
-          `Author ${i + 1}`,
-          `https://example.com/image${i}.jpg`,
-          'source-1',
-          ArticleStatus.CANDIDATE,
-          true,
-          new Date('2024-01-01T00:00:00Z'),
-          new Date('2024-01-01T00:00:00Z'),
-        );
-        await context.articleRepository.save(article);
-      }
-
-      await context.sendBatchNotification.execute();
-
-      const lastNotification = context.notification.getLastNotification();
-      expect(lastNotification).toBeNull();
-    });
-  });
-
-  describe('No notification sent when there are no candidate articles', () => {
-    it('should skip notification when no CANDIDATE articles exist', async () => {
-      const approvedArticle = new NewsArticle(
-        'article-1',
-        'https://example.com/article-1',
-        'Approved Article',
-        'Content',
-        'Author',
-        'https://example.com/image.jpg',
+    for (let i = 0; i < 5; i++) {
+      const article = new NewsArticle(
+        `article-${i}`,
+        `https://example.com/article-${i}`,
+        `Article ${i + 1}`,
+        `Content ${i + 1}`,
+        `Author ${i + 1}`,
+        `https://example.com/image${i}.jpg`,
         'source-1',
-        ArticleStatus.APPROVED,
+        ArticleStatus.CANDIDATE,
         false,
         new Date('2024-01-01T00:00:00Z'),
         new Date('2024-01-01T00:00:00Z'),
       );
-      await context.articleRepository.save(approvedArticle);
+      articles.push(article);
+      await context.articleRepository.save(article);
+    }
 
-      const rejectedArticle = new NewsArticle(
-        'article-2',
-        'https://example.com/article-2',
-        'Rejected Article',
-        'Content',
-        'Author',
-        'https://example.com/image2.jpg',
+    for (let i = 0; i < 2; i++) {
+      articles[i].notify();
+      await context.articleRepository.update(articles[i]);
+    }
+
+    await context.sendBatchNotification.execute();
+
+    const lastNotification = context.notification.getLastNotification();
+    expect(lastNotification).not.toBeNull();
+    expect(lastNotification?.length).toBe(3);
+
+    const allArticles = await context.articleRepository.find();
+    const notifiedArticles = allArticles.filter((a) => a.notified);
+    expect(notifiedArticles.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('No notification sent when all candidates are already notified', async () => {
+    for (let i = 0; i < 2; i++) {
+      const article = new NewsArticle(
+        `article-${i}`,
+        `https://example.com/article-${i}`,
+        `Article ${i + 1}`,
+        `Content ${i + 1}`,
+        `Author ${i + 1}`,
+        `https://example.com/image${i}.jpg`,
         'source-1',
-        ArticleStatus.REJECTED,
-        false,
+        ArticleStatus.CANDIDATE,
+        true,
         new Date('2024-01-01T00:00:00Z'),
         new Date('2024-01-01T00:00:00Z'),
       );
-      await context.articleRepository.save(rejectedArticle);
+      await context.articleRepository.save(article);
+    }
 
-      await context.sendBatchNotification.execute();
+    await context.sendBatchNotification.execute();
 
-      const lastNotification = context.notification.getLastNotification();
-      expect(lastNotification).toBeNull();
-    });
+    const lastNotification = context.notification.getLastNotification();
+    expect(lastNotification).toBeNull();
+  });
+
+  it('No notification sent when there are no candidate articles', async () => {
+    const approvedArticle = new NewsArticle(
+      'article-1',
+      'https://example.com/article-1',
+      'Approved Article',
+      'Content',
+      'Author',
+      'https://example.com/image.jpg',
+      'source-1',
+      ArticleStatus.APPROVED,
+      false,
+      new Date('2024-01-01T00:00:00Z'),
+      new Date('2024-01-01T00:00:00Z'),
+    );
+    await context.articleRepository.save(approvedArticle);
+
+    const rejectedArticle = new NewsArticle(
+      'article-2',
+      'https://example.com/article-2',
+      'Rejected Article',
+      'Content',
+      'Author',
+      'https://example.com/image2.jpg',
+      'source-1',
+      ArticleStatus.REJECTED,
+      false,
+      new Date('2024-01-01T00:00:00Z'),
+      new Date('2024-01-01T00:00:00Z'),
+    );
+    await context.articleRepository.save(rejectedArticle);
+
+    await context.sendBatchNotification.execute();
+
+    const lastNotification = context.notification.getLastNotification();
+    expect(lastNotification).toBeNull();
   });
 });

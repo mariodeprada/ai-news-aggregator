@@ -858,4 +858,65 @@ describe('NewsArticle', () => {
       );
     });
   });
+
+  describe('publish', () => {
+    it('should publish an approved summarized article', () => {
+      const newsArticle = new NewsArticle(
+        'article-123',
+        'https://example.com/article',
+        'Example Article',
+        'This is an example article.',
+        'John Doe',
+        'https://example.com/image.jpg',
+        'source-123',
+        ArticleStatus.APPROVED,
+        false,
+        new Date(),
+        new Date(),
+        'Generated summary'
+      );
+
+      newsArticle.publish();
+
+      expect(newsArticle.status).toBe(ArticleStatus.PUBLISHED);
+    });
+
+    it('should reject publishing an article without status APPROVED', () => {
+      const newsArticle = new NewsArticle(
+        'article-123',
+        'https://example.com/article',
+        'Example Article',
+        'This is an example article.',
+        'John Doe',
+        'https://example.com/image.jpg',
+        'source-123',
+        ArticleStatus.CANDIDATE,
+        false,
+        new Date(),
+        new Date(),
+        'Generated summary'
+      );
+
+      expect(() => newsArticle.publish()).toThrow(
+        new ArgumentError('Cannot publish an article without status APPROVED')
+      );
+    });
+
+    it('should reject publishing an article without summary', () => {
+      const newsArticle = new NewsArticle(
+        'article-123',
+        'https://example.com/article',
+        'Example Article',
+        'This is an example article.',
+        'John Doe',
+        'https://example.com/image.jpg',
+        'source-123',
+        ArticleStatus.APPROVED
+      );
+
+      expect(() => newsArticle.publish()).toThrow(
+        new ArgumentError('Cannot publish an article without summary')
+      );
+    });
+  });
 });

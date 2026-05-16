@@ -4,6 +4,7 @@ export enum ArticleStatus {
   CANDIDATE = 'CANDIDATE',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  PUBLISHED = 'PUBLISHED',
 }
 
 export class NewsArticle {
@@ -142,6 +143,17 @@ export class NewsArticle {
       throw new ArgumentError('Cannot reject an article with status REJECTED');
     }
     this._status = ArticleStatus.REJECTED;
+    this._updatedAt = new Date();
+  }
+
+  publish(): void {
+    if (this._status !== ArticleStatus.APPROVED) {
+      throw new ArgumentError('Cannot publish an article without status APPROVED');
+    }
+    if (!this.summarized) {
+      throw new ArgumentError('Cannot publish an article without summary');
+    }
+    this._status = ArticleStatus.PUBLISHED;
     this._updatedAt = new Date();
   }
 

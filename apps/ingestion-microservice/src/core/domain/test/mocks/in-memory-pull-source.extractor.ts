@@ -5,6 +5,7 @@ export class InMemoryPullSourceExtractor implements PullSourceExtractorPort {
   private articlesToReturn: ExtractedArticleData[] = [];
   private shouldThrowError: boolean = false;
   private errorMessage: string = '';
+  private errorsBySourceId: Map<string, string> = new Map();
 
   setArticlesToReturn(articles: ExtractedArticleData[]) {
     this.articlesToReturn = articles;
@@ -15,18 +16,28 @@ export class InMemoryPullSourceExtractor implements PullSourceExtractorPort {
     this.errorMessage = message;
   }
 
+  setErrorForSource(sourceId: string, message: string) {
+    this.errorsBySourceId.set(sourceId, message);
+  }
+
   clearError() {
     this.shouldThrowError = false;
     this.errorMessage = '';
+    this.errorsBySourceId.clear();
   }
 
   clear() {
     this.articlesToReturn = [];
     this.shouldThrowError = false;
     this.errorMessage = '';
+    this.errorsBySourceId.clear();
   }
 
   async extract(source: PullSource, lastPolledAt?: Date): Promise<ExtractedArticleData[]> {
+    const sourceError = this.errorsBySourceId.get(source.id);
+    if (sourceError) {
+      throw new Error(sourceError);
+    }
     if (this.shouldThrowError) {
       throw new Error(this.errorMessage);
     }
